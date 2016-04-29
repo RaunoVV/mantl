@@ -20,12 +20,14 @@ variable "edge_count" { default = 2 }
 variable "region" {default = "us-west-2"}
 variable "short_name" {default = "mantl"}
 variable "ssh_username" {default = "centos"}
+variable "kube_worker_count" { default = 4 }
 variable "worker_count" { default = 4 }
 variable "dns_subdomain" { default = ".dev" }
 variable "dns_domain" { default = "my-domain.com" }
 variable "dns_zone_id" { default = "XXXXXXXXXXXX" }
 variable "control_type" { default = "m3.medium" }
 variable "edge_type" { default = "m3.medium" }
+variable "kube_worker_type" { default = "m3.large" }
 variable "worker_type" { default = "m3.large" }
 
 provider "aws" {
@@ -88,6 +90,27 @@ module "control-nodes" {
   #vpc_id = "${terraform_remote_state.vpc.output.vpc_id}"
   #vpc_subnet_ids = "${terraform_remote_state.vpc.output.subnet_ids}"
 }
+
+module "kube-worker-nodes" {
+  source = "./terraform/aws/instance"
+  count = "${var.kube_worker_count}"
+  datacenter = "${var.datacenter}"
+  role = "kubeworker"
+  ec2_type = "${var.kube_worker_type}"
+  ssh_username = "${var.ssh_username}"
+  source_ami = "${lookup(var.amis, var.region)}"
+  short_name = "${var.short_name}"
+  ssh_key_pair = "${module.ssh-key.ssh_key_name}"
+  availability_zones = "${module.vpc.availability_zones}"
+  security_group_ids = "${module.vpc.default_security_group},${module.security-groups.worker_security_group}"
+  vpc_subnet_ids = "${module.vpc.subnet_ids}"
+  # uncomment below it you want to use remote state for vpc variables
+  #availability_zones = "${terraform_remote_state.vpc.output.availability_zones}"
+  #security_group_ids = "${terraform_remote_state.vpc.output.default_security_group},${module.security-groups.worker_security_group}"
+  #vpc_id = "${terraform_remote_state.vpc.output.vpc_id}"
+  #vpc_subnet_ids = "${terraform_remote_state.vpc.output.subnet_ids}"
+}
+
 
 module "edge-nodes" {
   source = "./terraform/aws/instance"
